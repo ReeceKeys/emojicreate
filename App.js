@@ -1,19 +1,126 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, Button, Modal, Pressable } from 'react-native';
+import React, { useEffect, useState, useMemo, useCallback  } from 'react';
+import { StyleSheet, View, Text, Button, Modal, Pressable, FlatList, TextInput } from 'react-native';
 import ImageManipulator from './components/imagemanipulator';
-import { DiamondPlus, ArrowUp, ArrowUpToLine, ArrowDown, ArrowDownToLine } from "lucide-react-native";
+import { DiamondPlus, UsersRound, ArrowUp, ArrowUpToLine, ArrowDown, ArrowDownToLine } from "lucide-react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+
 export default function App() {
   const [images, setImages] = useState([]);
   const [imagePicker, setImagePicker] = useState(false);
+  const [communityVisible, setCommunityVisible] = useState(false);
+  const [emojiVisible, setEmojiVisible] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [emojis, setEmojis] = useState([]);
+  const [search, setSearch] = useState('');
 
-  const addImage = () => {
-    const newImage = `https://picsum.photos/200?random=${Date.now()}`;
-    setImages(prev => [
-      ...prev,
-      {id: Date.now().toString(), uri: newImage}
-    ])
+
+  const decodeHtml = (str) => {
+    return str.replace(/&#(\d+);/g, (match, dec) => String.fromCodePoint(parseInt(dec, 10)));
+  };  
+
+  useEffect(() => {
+    const loadEmojis = async () => {
+      try {
+        const cached = await AsyncStorage.getItem('EMOJI_CACHE');
+
+        if (cached) {
+          setEmojis(JSON.parse(cached));
+          return;
+        }
+
+        const res = await fetch('https://emojihub.yurace.pro/api/all');
+        const data = await res.json();
+
+        setEmojis(data);
+        await AsyncStorage.setItem('EMOJI_CACHE', JSON.stringify(data));
+      } catch (err) {
+        console.error('Emoji load error:', err);
+      }
+    };
+
+    loadEmojis();
+  }, []);
+
+  const filteredEmojis = useMemo(() => {
+    return (emojis ?? []).filter(e =>
+      e?.name?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [emojis, search]);
+
+
+
+  const renderItem = useCallback(({ item }) => {
+    const emojiChar = typeof item.htmlCode[0] === 'string' && item.htmlCode[0].includes('&#')
+      ? decodeHtml(item.htmlCode[0])
+      : item.htmlCode[0];
+
+    const handleAddEmoji = async () => {
+      try {
+        setImages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'emoji',
+            content: emojiChar,
+          }
+        ]);
+        setEmojiVisible(false); 
+        /*
+        setTimeout(() => {
+          setImagePicker(false); 
+        }, 10);
+        */
+      } catch (err) {
+        console.error('Emoji render error:', err);
+      }
+    };
+
+
+
+    return (
+      <Pressable
+        onPress={handleAddEmoji}
+        style={{ width: '50%', alignItems: 'center', padding: 50 }}
+      >
+        <Text style={{ fontSize: 60 }}>{emojiChar}</Text>
+      </Pressable>
+    );
+  }, []);
+  const addImage = async () => {
+    // Ask permission
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Permission to access photos is required.');
+      return;
+    }
+
+    // Open picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaType.Images, // updated
+      allowsEditing: true,
+      quality: 1,
+      allowsEditing: false,
+    });
+
+
+    if (!result.canceled) {
+      setImages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: 'image',
+          content: result.assets[0].uri,
+        },
+      ]);
+
+      // close menus SAFELY
+      setTimeout(() => {
+        setImagePicker(false);
+      }, 0);
+    }
   };
+
 
   const deleteImage = (id) => {
     setImages(prev => prev.filter(img => img.id !== id))
@@ -88,7 +195,8 @@ export default function App() {
             <ImageManipulator 
               key={img.id} 
               id={img.id} 
-              uri={img.uri} 
+              type={img.type}
+              content={img.content} 
               selected={selectedId === img.id}
               onSelect={(id) => setSelectedId(prev => prev === id ? null : id)}
               onDelete={deleteImage} 
@@ -96,23 +204,66 @@ export default function App() {
           ))}
         </View>
       </View>
-
+      
       <Modal visible={imagePicker} transparent={true}>
         <View style={styles.modal}>
           <View style={styles.modalBtnContainer}>
             <Pressable onPress={() => addImage()}>
-              <Text style={{...styles.modalBtn, color: 'green'}}>Add</Text>
+              <Text style={{...styles.modalBtn, color: 'green'}}>Library</Text>
+            </Pressable>
+            <Pressable onPress={() => setEmojiVisible(true)}>
+              <Text style={{...styles.modalBtn, color: 'green'}}>Emoji</Text>
             </Pressable>
             <Pressable onPress={() => setImagePicker(false)}>
               <Text style={styles.modalBtn}>Close</Text>
             </Pressable>
           </View>
         </View>
+        <Modal visible={emojiVisible}>
+          <View style={styles.emojiModal}>
+            <View style={{marginTop: 100, borderBottomColor: 'black', borderBottomWidth: 1, width: '100%'}}>
+              <View style={styles.searchContainer}>
+                <TextInput
+                  placeholder="Search emojis…"
+                  value={search}
+                  onChangeText={setSearch}
+                  style={styles.searchInput}
+                  placeholderTextColor="#999"
+                />
+              </View>
+            </View>
+            <FlatList
+              data={filteredEmojis}
+              keyExtractor={(item, index) => index.toString()}
+              numColumns={2}
+              renderItem={renderItem}
+              style={{flex: 1}}
+              keyboardShouldPersistTaps="handled"
+              columnWrapperStyle={{justifyContent: 'center'}}
+            > 
+            </FlatList>
+            <View style={{marginBottom: 25, borderTopColor: 'black', borderTopWidth: 1, width: '100%', alignItems: 'center'}}>
+              <Pressable onPress={() => setEmojiVisible(false)} style={{marginTop: 10}}>
+                <Text style={{...styles.modalBtn, padding: 10, minWidth: '50%', marginTop: 25}}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       </Modal>
+
       <View style={styles.footContainer}>
-        <Pressable onPress={() => setImagePicker(true)}>
-          <DiamondPlus style={styles.addBtn} size={36} />
-        </Pressable>
+        <View style={styles.btnManip}>
+          <Pressable onPress={() => setImagePicker(true)} style={styles.addBtn}>
+            <UsersRound style={styles.actionBtnText} size={36} />
+          </Pressable>
+          <Pressable onPress={() => setImagePicker(true)} style={styles.addBtn}>
+            <DiamondPlus style={styles.addBtnText} size={36} />
+          </Pressable>
+          <Pressable onPress={() => setImagePicker(true)} style={styles.addBtn}>
+            <Text style={{color: 'white', textAlign: 'center'}}>Community</Text>
+            <Text style={{color: 'white', textAlign:'center'}}>Created</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -145,34 +296,56 @@ const styles = StyleSheet.create({
     paddingBottom: 50,
     flexDirection: 'column',
     justifyContent: 'center',
-    gap: 50,
   },
   footContainer: {
     textAlign: 'center',
     alignItems: 'center',
     backgroundColor: 'black',
     paddingTop: 50,
+    width: '100%',
     paddingBottom: 75,
     flexDirection: 'column',
-    justifyContent: 'center',
-    gap: 50,
+    justifyContent: 'space-evenly',
   },
-  addBtn : {
+
+  searchContainer: {
+  padding: 10,
+  borderBottomWidth: 1,
+  borderBottomColor: '#ddd',
+},
+
+searchInput: {
+  backgroundColor: '#f2f2f2',
+  padding: 10,
+  borderRadius: 8,
+  fontSize: 16,
+},
+
+  addBtnText : {
     color: '#74f774ff',
     textAlign: 'center',
-    fontSize: 50
+    fontSize: 50,
   },
   btnManip: {
     display: 'flex',
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
   },
   actionBtn: {
-    marginHorizontal: 5,
+    marginHorizontal: 20,
     padding: 8,
     borderRadius: 6,
   },
+  addBtn: {
+    minWidth: '30%',
+    alignContent: 'center',
+    outlineColor: 'white',
+    alignItems: 'center'
+  },
   actionBtnText: {
-    color: '#74f774ff',
+    color: '#ffffffff',
     fontWeight: 'bold',
   },
   modalBtn: {
@@ -191,6 +364,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 20,
+  },
+  emojiModal: {
+    flex: 1,
+    backgroundColor: '#ffffffcc',
+    justifyContent: 'center',
   },
   modalBtnContainer: {
     flex: 1,

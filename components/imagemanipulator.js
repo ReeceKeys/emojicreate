@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
-import { View, Image, StyleSheet, Animated, PanResponder, Alert } from 'react-native';
+import { View, Image, StyleSheet, Animated, PanResponder, Alert, Text } from 'react-native';
 
-export default function ImageManipulator({ id, uri, selected, onSelect, onDelete }) {
+export default function ImageManipulator({ id, content, type, selected, onSelect, onDelete }) {
   const pan = useRef(new Animated.ValueXY()).current;
   const scale = useRef(new Animated.Value(1)).current;
   const initialDistance = useRef(0);
@@ -72,6 +72,8 @@ export default function ImageManipulator({ id, uri, selected, onSelect, onDelete
     })
   ).current;
 
+  const isImage = type==='image';
+
   return (
     <Animated.View
       {...panResponder.panHandlers}
@@ -85,11 +87,23 @@ export default function ImageManipulator({ id, uri, selected, onSelect, onDelete
           ],
           borderWidth: selected ? 2 : 0,
           borderColor: selected ? 'yellow' : 'transparent',
-          padding: selected ? -1: 0,
         },
       ]}
     >
-      <Image source={{ uri }} style={{ width: 150, height: 150 }} resizeMode="contain" />
+      <View 
+        style={{
+          width: 150,
+          height: 150,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        {isImage ? (
+          <Image source={{ uri: content }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+        ) : (
+          <Text style={{ fontSize: 120 }}>{content}</Text>
+        )}
+      </View>
     </Animated.View>
   );
 }
