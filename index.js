@@ -1,8 +1,16 @@
 import { registerRootComponent } from 'expo';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import App from './App';
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
+// Wrap your App with SafeAreaProvider
+const Root = () => (
+  <SafeAreaProvider>
+    <App />
+  </SafeAreaProvider>
+);
+
+// registerRootComponent calls AppRegistry.registerComponent('main', () => Root);
 // It also ensures that whether you load the app in Expo Go or in a native build,
 // the environment is set up appropriately
-registerRootComponent(App);
+registerRootComponent(Root);
