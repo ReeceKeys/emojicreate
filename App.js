@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback  } from 'react';
-import { StyleSheet, View, Text, Button, Modal, Pressable, FlatList, TextInput } from 'react-native';
+import { StyleSheet, View, Text, Button, Modal, Pressable, FlatList, TextInput, Alert } from 'react-native';
 import ImageManipulator from './components/imagemanipulator';
-import { DiamondPlus, UsersRound, ArrowUp, ArrowUpToLine, ArrowDown, ArrowDownToLine } from "lucide-react-native";
+import { DiamondPlus, Trash, Info, UsersRound, ArrowUp, ArrowUpToLine, ArrowDown, ArrowDownToLine } from "lucide-react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -9,6 +9,7 @@ export default function App() {
   const [images, setImages] = useState([]);
   const [imagePicker, setImagePicker] = useState(false);
   const [communityVisible, setCommunityVisible] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
   const [emojiVisible, setEmojiVisible] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [emojis, setEmojis] = useState([]);
@@ -90,6 +91,7 @@ export default function App() {
   const addImage = async () => {
     // Ask permission
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    console.log(status)
     if (status !== 'granted') {
       alert('Permission to access photos is required.');
       return;
@@ -97,7 +99,7 @@ export default function App() {
 
     // Open picker
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images, // updated
+      mediaTypes: ['images'], // updated
       allowsEditing: true,
       quality: 1,
       allowsEditing: false,
@@ -126,8 +128,32 @@ export default function App() {
     setImages(prev => prev.filter(img => img.id !== id))
   };
 
+  const deleteAllImages = () => {
+    Alert.alert(
+      'Clear the canvas?',
+      'This will remove all images from the canvas.',
+      [
+        { text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: () => {
+            setImages([]);
+            setSelectedId(null);
+          }
+        }
+      ]
+    )
+  }
+
   const moveToFront = () => {
-    if (!selectedId) return;
+    if (!selectedId) {
+      Alert.alert(
+        "No photo selected", 
+        "Please select a photo to manipulate.",
+      );
+      return;
+    };
     setImages(prev => {
       const selectedImg = prev.find(img => img.id === selectedId);
       const others = prev.filter(img => img.id !== selectedId);
@@ -170,7 +196,7 @@ export default function App() {
     <View style={styles.container}>
       <View style={styles.headContainer}>
 
-        <View style={styles.btnManip}>
+        <View style={{...styles.btnManip, backgroundColor: 'teal', padding: 20, paddingTop: 100, borderRadius: '5%'}}>
           <Pressable onPress={moveToFront} style={styles.actionBtn}>
             <ArrowUpToLine size={36} style={styles.actionBtnText}/>
           </Pressable>
@@ -251,17 +277,19 @@ export default function App() {
         </Modal>
       </Modal>
 
-      <View style={styles.footContainer}>
-        <View style={styles.btnManip}>
-          <Pressable onPress={() => setImagePicker(true)} style={styles.addBtn}>
+      <View style={{...styles.footContainer }}>
+        <View style={{...styles.btnManip, backgroundColor: '#252525ff', padding: 10, borderRadius: '5%'}}>
+          <Pressable onPress={() => setCommunityVisible(true)} style={styles.addBtn}>
             <UsersRound style={styles.actionBtnText} size={36} />
+          </Pressable>
+          <Pressable onPress={() => deleteAllImages()} style={styles.addBtn}>
+            <Trash style={styles.addBtnText} size={36} />
           </Pressable>
           <Pressable onPress={() => setImagePicker(true)} style={styles.addBtn}>
             <DiamondPlus style={styles.addBtnText} size={36} />
           </Pressable>
-          <Pressable onPress={() => setImagePicker(true)} style={styles.addBtn}>
-            <Text style={{color: 'white', textAlign: 'center'}}>Community</Text>
-            <Text style={{color: 'white', textAlign:'center'}}>Created</Text>
+          <Pressable onPress={() => setHelpVisible(true)} style={styles.addBtn}>
+            <Info style={styles.actionBtnText} size={36} />
           </Pressable>
         </View>
       </View>
@@ -276,36 +304,34 @@ const styles = StyleSheet.create({
   },
   canvasContainer: {
     flex: 1,
-    margin: 30,
-    zIndex: 40,
+    margin: 20,
   },
   canvas: {
     flex: 1,
     borderBlockColor: 'black',
     borderColor: 'black',
     borderWidth: 2,
-    backgroundColor: '#5c5c5cff',
+    backgroundColor: '#ffffffff',
     zIndex: 10,
     overflow: 'hidden',
   },
   headContainer: {
     textAlign: 'center',
     alignItems: 'center',
-    backgroundColor: 'black',
-    paddingTop: 75,
-    paddingBottom: 50,
+    backgroundColor: 'white',
+    paddingBottom: 25,
     flexDirection: 'column',
     justifyContent: 'center',
   },
   footContainer: {
     textAlign: 'center',
     alignItems: 'center',
-    backgroundColor: 'black',
-    paddingTop: 50,
+    backgroundColor: 'white',
+    paddingTop: 25,
     width: '100%',
-    paddingBottom: 75,
+    paddingBottom: 25,
     flexDirection: 'column',
-    justifyContent: 'space-evenly',
+    justifyContent: 'center',
   },
 
   searchContainer: {
@@ -339,10 +365,9 @@ searchInput: {
     borderRadius: 6,
   },
   addBtn: {
-    minWidth: '30%',
-    alignContent: 'center',
+    marginHorizontal: 20,
+    padding: 8,
     outlineColor: 'white',
-    alignItems: 'center'
   },
   actionBtnText: {
     color: '#ffffffff',
