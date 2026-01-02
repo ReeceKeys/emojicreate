@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { StyleSheet, View, Text, Modal, Pressable, FlatList, TextInput, Alert, Animated } from 'react-native';
 import ImageManipulator from './components/imagemanipulator';
-import { DiamondPlus, SmilePlus, Image, Trash, Info, UsersRound, ArrowUp, ArrowUpToLine, ArrowDown, ArrowDownToLine } from "lucide-react-native";
+import { DiamondPlus, History, SmilePlus, Image, Trash, Info, UsersRound, ArrowUp, ArrowUpToLine, ArrowDown, ArrowDownToLine } from "lucide-react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TutorialModal from './components/tutorial';
 import * as ImagePicker from 'expo-image-picker';
@@ -15,7 +15,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [emojis, setEmojis] = useState([]);
   const [search, setSearch] = useState('');
-
+  const imageRefs = useRef({});
   const imagePickerOpacity = useRef(new Animated.Value(0)).current;
   const emojiOpacity = useRef(new Animated.Value(0)).current;
 
@@ -36,7 +36,7 @@ export default function App() {
       useNativeDriver: true,
     }).start();
   }, [emojiVisible]);
-
+ 
   const decodeHtml = (str) => {
     return str.replace(/&#(\d+);/g, (match, dec) => String.fromCodePoint(parseInt(dec, 10)));
   };
@@ -121,7 +121,10 @@ export default function App() {
   };
 
   const moveToBack = () => {
-    if (!selectedId) return;
+    if (!selectedId) {
+      Alert.alert("No photo selected", "Please select a photo to manipulate.");
+      return;
+    }
     setImages(prev => {
       const sel = prev.find(i => i.id === selectedId);
       return [sel, ...prev.filter(i => i.id !== selectedId)];
@@ -129,7 +132,10 @@ export default function App() {
   };
 
   const moveUp = () => {
-    if (!selectedId) return;
+    if (!selectedId) {
+      Alert.alert("No photo selected", "Please select a photo to manipulate.");
+      return;
+    }
     setImages(prev => {
       const i = prev.findIndex(x => x.id === selectedId);
       if (i === prev.length - 1) return prev;
@@ -140,7 +146,10 @@ export default function App() {
   };
 
   const moveDown = () => {
-    if (!selectedId) return;
+    if (!selectedId) {
+      Alert.alert("No photo selected", "Please select a photo to manipulate.");
+      return;
+    }
     setImages(prev => {
       const i = prev.findIndex(x => x.id === selectedId);
       if (i === 0) return prev;
@@ -150,18 +159,26 @@ export default function App() {
     });
   };
 
+  const resetRotation = () => {
+    if (!selectedId) {
+      Alert.alert("No photo selected", "Please select a photo to manipulate.");
+      return;
+    }
+    imageRefs.current[selectedId]?.resetRotation();
+  };
+
   
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.headContainer}>
-        <View style={{ ...styles.btnManip, backgroundColor: '#834040ff', paddingVertical: 20, width: '100%', paddingTop: 100, borderRadius: 0 }}>
+        <View style={{ ...styles.btnManip, backgroundColor: '#006579ff', paddingVertical: 20, width: '100%', paddingTop: 100, borderRadius: 0 }}>
           <Pressable onPress={moveToFront} style={styles.actionBtn}><ArrowUpToLine size={36} style={styles.actionBtnText} /></Pressable>
           <Pressable onPress={moveToBack} style={styles.actionBtn}><ArrowDownToLine size={36} style={styles.actionBtnText} /></Pressable>
+          <Pressable onPress={resetRotation} style={styles.actionBtn}><History size={36} style={styles.actionBtnText} /></Pressable>
           <Pressable onPress={moveUp} style={styles.actionBtn}><ArrowUp size={36} style={styles.actionBtnText} /></Pressable>
           <Pressable onPress={moveDown} style={styles.actionBtn}><ArrowDown size={36} style={styles.actionBtnText} /></Pressable>
-          <Pressable onPress={resetRotation} style={styles.actionBtn}><ArrowDown size={36} style={styles.actionBtnText} /></Pressable>
         </View>
       </View>
 
@@ -171,6 +188,7 @@ export default function App() {
           {images.map(img => (
             <ImageManipulator
               key={img.id}
+              ref={el => (imageRefs.current[img.id] = el)}
               id={img.id}
               type={img.type}
               content={img.content}
@@ -187,13 +205,13 @@ export default function App() {
         <Animated.View style={{ opacity: imagePickerOpacity,  height: '100%', justifyContent: 'center', alignItems: 'center' }}>
           <View style={styles.modal}>
             <View style={styles.modalBtnContainer}>
-              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60}} onPress={addImage}> 
+              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60, borderLeftColor: 'white', borderLeftWidth: 1, borderBottomColor: 'white', borderBottomWidth: 1}} onPress={addImage}> 
                 <Image size={36} style={{...styles.modalBtn, color: '#74f774ff'}}></Image>
               </Pressable>
-              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60}} onPress={() => { setImagePickerVisible(false); setTimeout(() => setEmojiVisible(true), 0); }}>
+              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60, borderLeftColor: 'white', borderLeftWidth: 1, borderBottomColor: 'white', borderBottomWidth: 1}} onPress={() => { setImagePickerVisible(false); setTimeout(() => setEmojiVisible(true), 0); }}>
                 <SmilePlus size={36} style={{...styles.modalBtn, color: '#f5ff86ff'}}/>
               </Pressable>
-              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60}} onPress={() => setImagePickerVisible(false)}>
+              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60, borderLeftColor: 'white', borderLeftWidth: 1, borderBottomColor: 'white', borderBottomWidth: 1}} onPress={() => setImagePickerVisible(false)}>
                 <Text style={styles.modalBtn}>Close</Text>
               </Pressable>
             </View>
@@ -255,20 +273,20 @@ export default function App() {
 
 // ==== Styles unchanged ====
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  canvasContainer: { flex: 1, margin: 20 },
+  container: { flex: 1, backgroundColor: '#252525ff' },
+  canvasContainer: { flex: 1, margin: 20, backgroundColor: '#252525ff' },
   canvas: { flex: 1, borderBlockColor: 'black', borderColor: 'black', borderWidth: 2, backgroundColor: '#ffffffff', zIndex: 10, overflow: 'hidden' },
-  headContainer: { textAlign: 'center', alignItems: 'center', backgroundColor: 'white', paddingBottom: 25, flexDirection: 'column', justifyContent: 'center' },
-  footContainer: { textAlign: 'center', alignItems: 'center', backgroundColor: 'white', paddingTop: 25, width: '100%', paddingBottom: 50, flexDirection: 'column', justifyContent: 'center' },
+  headContainer: { textAlign: 'center', alignItems: 'center', backgroundColor: '#252525ff', paddingBottom: 25, flexDirection: 'column', justifyContent: 'center' },
+  footContainer: { textAlign: 'center', alignItems: 'center', backgroundColor: '#252525ff', paddingTop: 25, width: '100%', paddingBottom: 50, flexDirection: 'column', justifyContent: 'center' },
   searchContainer: { padding: 10, paddingBottom: 40, borderBottomWidth: 1, borderBottomColor: '#ddd' },
   searchInput: { backgroundColor: '#f2f2f2', padding: 10, marginHorizontal: 40, borderRadius: 8, fontSize: 16 },
   addBtnText: { color: '#74f774ff', textAlign: 'center', fontSize: 50 },
   btnManip: { display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
-  actionBtn: { marginHorizontal: 20, padding: 8, borderRadius: 6 },
+  actionBtn: { marginHorizontal: 14, padding: 8, borderRadius: 6 },
   addBtn: { marginHorizontal: 20, padding: 8, outlineColor: 'white' },
   actionBtnText: { color: '#ffffffff', fontWeight: 'bold' },
   modalBtn: { backgroundColor: 'white', textAlign: 'center', fontSize: 16, borderRadius: '10%', backgroundColor: '#252525ff', color: 'white' },
-  modal: { flex: 1, width: '100%', height: '100%', flexDirection: 'column', backgroundColor: '#ffffffcc', justifyContent: 'center', alignItems: 'center', gap: 20 },
+  modal: { flex: 1, width: '100%', height: '100%', flexDirection: 'column', backgroundColor: '#252525ff', justifyContent: 'center', alignItems: 'center', gap: 20 },
   emojiModal: { flex: 1, backgroundColor: '#ffffffcc', justifyContent: 'center' },
-  modalBtnContainer: { textAlign: 'center', justifyContent: 'center', maxWidth: 300, gap: 50, height: '100%'}
+  modalBtnContainer: { textAlign: 'center', justifyContent: 'center', maxWidth: '100%', gap: 50, height: '100%'}
 });

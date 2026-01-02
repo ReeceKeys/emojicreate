@@ -55,12 +55,17 @@ const ImageManipulator = forwardRef(({ id, content, type, selected, onSelect, on
         if (touches.length === 2) {
           const dx = touches[0].pageX - touches[1].pageX;
           const dy = touches[0].pageY - touches[1].pageY;
+          const distance = Math.sqrt(dx * dx + dy * dy);          
           const angle = Math.atan2(dy, dx);
-          if (!initialAngle.current) initialAngle.current = angle;
-          else {
-            const rotationDelta = angle - initialAngle.current;
-            rotate.setValue(lastRotation.current + rotationDelta * rotationSensitivity);
+          if (!initialDistance.current) {
+            initialDistance.current = distance;
+            initialAngle.current = angle;
+            return;
           }
+          const scaleFactor = distance / initialDistance.current;
+          scale.setValue(scaleFactor);
+          const rotationDelta = angle - initialAngle.current;
+          rotate.setValue(lastRotation.current + rotationDelta * rotationSensitivity);
         }
       },
       onPanResponderRelease: () => {

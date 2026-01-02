@@ -1,14 +1,15 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Modal, View, Text, Pressable, Animated, StyleSheet, Dimensions, ScrollView, Image } from 'react-native';
+import { Platform, Modal, View, Text, Pressable, Animated, StyleSheet, Dimensions, ScrollView, Image } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
 export default function TutorialModal({ visible, onClose }) {
   const steps = [
-    { text: "Tap the + button to add images or emojis", image: require('../assets/step1.png') },
-    { text: "Select an image to move, resize, or delete it", image: require('../assets/step2.png') },
-    { text: "Use the arrows to change the order of images", image: require('../assets/step3.png') },
-    { text: "Swipe down on the canvas to remove all items", image: require('../assets/step4.png') }
+    { text: "Tap the + button to\nadd images or icons.", image: require('../assets/step1.png') },
+    { text: "Select an image to move, reorder, and resize. Hold an image to delete it.", image: require('../assets/step2.png') },
+    { text: "Once your done designing, save\nthe canvas to your camera roll.", image: require('../assets/step3.png') },
+    { text: "In your camera roll, hold your\nicon and select add sticker.", image: require('../assets/step4.png') },
+    { text: "Your new icon will be available\nto use in your messages!", image: require('../assets/step4.png') }
   ];
 
   const [currentStep, setCurrentStep] = useState(0);
