@@ -68,18 +68,34 @@ const ImageManipulator = forwardRef(({ id, content, type, selected, onSelect, on
           rotate.setValue(lastRotation.current + rotationDelta * rotationSensitivity);
         }
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (e, gesture) => {
         pan.flattenOffset();
         initialDistance.current = 0;
         initialAngle.current = 0;
         lastRotation.current = rotate._value;
+        
         if (longPressTimeout.current) {
           clearTimeout(longPressTimeout.current);
           longPressTimeout.current = null;
         }
+
         const duration = Date.now() - touchStartTime.current;
-        if (!moved.current && duration < 200) onSelect(id);
+
+        if (!moved.current && duration < 200) {
+          // Tap detected
+          if (selected) {
+            // Already selected → tap again on itself keeps it selected
+            onSelect(id);
+          } else {
+            // Not selected → select it
+            onSelect(id);
+          }
+        } else if (!moved.current && duration < 200 && !selected) {
+          // Tap outside image → deselect
+          onDeselect?.();
+        }
       },
+
       onPanResponderTerminationRequest: () => true,
     })
   ).current;
@@ -89,6 +105,7 @@ const ImageManipulator = forwardRef(({ id, content, type, selected, onSelect, on
   return (
     <Animated.View
       {...panResponder.panHandlers}
+      pointerEvents="box-none"
       style={[
         styles.imageWrapper,
         {

@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { StyleSheet, View, Text, Modal, Pressable, FlatList, TextInput, Alert, Animated } from 'react-native';
 import ImageManipulator from './components/imagemanipulator';
-import { DiamondPlus, History, SmilePlus, Image, Trash, Info, UsersRound, ArrowUp, ArrowUpToLine, ArrowDown, ArrowDownToLine } from "lucide-react-native";
+import { Download, DiamondPlus, History, SmilePlus, Image, Trash, Info, UsersRound, ArrowUp, ArrowUpToLine, ArrowDown, ArrowDownToLine } from "lucide-react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TutorialModal from './components/tutorial';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library'; 
+import ViewShot from 'react-native-view-shot';
 
 export default function App() {
   const [images, setImages] = useState([]);
@@ -18,7 +20,7 @@ export default function App() {
   const imageRefs = useRef({});
   const imagePickerOpacity = useRef(new Animated.Value(0)).current;
   const emojiOpacity = useRef(new Animated.Value(0)).current;
-
+  const viewRef = useRef();
   // Animate Image Picker
   useEffect(() => {
     Animated.timing(imagePickerOpacity, {
@@ -36,7 +38,10 @@ export default function App() {
       useNativeDriver: true,
     }).start();
   }, [emojiVisible]);
- 
+  
+  const capture = async () => {
+    const uri = await viewRef.current.capture();
+  }
   const decodeHtml = (str) => {
     return str.replace(/&#(\d+);/g, (match, dec) => String.fromCodePoint(parseInt(dec, 10)));
   };
@@ -81,6 +86,37 @@ export default function App() {
       </Pressable>
     );
   }, []);
+
+  const saveImage = async () => {
+    // Request permission
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Permission to access camera roll is required.');
+      return;
+    }
+
+    // Function to capture and save
+    const finishSave = async () => {
+      try {
+        const uri = await viewRef.current.capture();
+        await MediaLibrary.createAssetAsync(uri);
+        alert('Saved to Camera Roll!');
+      } catch (error) {
+        console.log('Save failed', error);
+        alert('Failed to save image.');
+      }
+    };
+
+    // Ask user before saving
+    Alert.alert(
+      'Save this image?',
+      'This will save the entire canvas to your camera roll.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Save', style: 'destructive', onPress: finishSave },
+      ]
+    );
+  };
 
   const addImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -173,45 +209,53 @@ export default function App() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.headContainer}>
-        <View style={{ ...styles.btnManip, backgroundColor: '#006579ff', paddingVertical: 20, width: '100%', paddingTop: 100, borderRadius: 0 }}>
+        <View style={{ ...styles.btnManip, backgroundColor: '#252525ff', paddingVertical: 20, width: '100%', paddingTop: 100, borderRadius: 0 }}>
           <Pressable onPress={moveToFront} style={styles.actionBtn}><ArrowUpToLine size={36} style={styles.actionBtnText} /></Pressable>
           <Pressable onPress={moveToBack} style={styles.actionBtn}><ArrowDownToLine size={36} style={styles.actionBtnText} /></Pressable>
-          <Pressable onPress={resetRotation} style={styles.actionBtn}><History size={36} style={styles.actionBtnText} /></Pressable>
+          <Pressable onPress={resetRotation} style={styles.actionBtn}><History size={36} style={{...styles.actionBtnText, color: '#f5ff86ff'}} /></Pressable>
           <Pressable onPress={moveUp} style={styles.actionBtn}><ArrowUp size={36} style={styles.actionBtnText} /></Pressable>
           <Pressable onPress={moveDown} style={styles.actionBtn}><ArrowDown size={36} style={styles.actionBtnText} /></Pressable>
         </View>
       </View>
 
       {/* Canvas */}
+      
       <View style={styles.canvasContainer}>
-        <View style={styles.canvas} contentContainerStyle={{ flexGrow: 1, width: '100%' }}>
-          {images.map(img => (
-            <ImageManipulator
-              key={img.id}
-              ref={el => (imageRefs.current[img.id] = el)}
-              id={img.id}
-              type={img.type}
-              content={img.content}
-              selected={selectedId === img.id}
-              onSelect={(id) => setSelectedId(prev => prev === id ? null : id)}
-              onDelete={deleteImage}
-            />
-          ))}
-        </View>
+        <ViewShot style={styles.canvas} ref={viewRef} options={{ format: 'png', quality: 1 }}>
+          <View  contentContainerStyle={{ flexGrow: 1, width: '100%' }}>
+            {images.map(img => (
+              <ImageManipulator
+                key={img.id}
+                ref={el => (imageRefs.current[img.id] = el)}
+                id={img.id}
+                type={img.type}
+                content={img.content}
+                selected={selectedId === img.id}
+                onSelect={(id) => setSelectedId(prev => prev === id ? null : id)}
+                onDelete={deleteImage}
+                onDeselect={() => setSelectedId(null)}
+              />
+            ))}
+          </View>
+        </ViewShot>
       </View>
+      
 
       {/* Image Picker Modal */}
       <Modal visible={imagePickerVisible} transparent={false} animationType="fade" style={{ flex: 1, justifyContent: 'center', alignItems: 'center', height: '100%' }}>
         <Animated.View style={{ opacity: imagePickerOpacity,  height: '100%', justifyContent: 'center', alignItems: 'center' }}>
           <View style={styles.modal}>
             <View style={styles.modalBtnContainer}>
-              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60, borderLeftColor: 'white', borderLeftWidth: 1, borderBottomColor: 'white', borderBottomWidth: 1}} onPress={addImage}> 
+              
+              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60}} onPress={addImage}> 
                 <Image size={36} style={{...styles.modalBtn, color: '#74f774ff'}}></Image>
               </Pressable>
-              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60, borderLeftColor: 'white', borderLeftWidth: 1, borderBottomColor: 'white', borderBottomWidth: 1}} onPress={() => { setImagePickerVisible(false); setTimeout(() => setEmojiVisible(true), 0); }}>
+              <View style={styles.divider}></View>
+              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60}} onPress={() => { setImagePickerVisible(false); setTimeout(() => setEmojiVisible(true), 0); }}>
                 <SmilePlus size={36} style={{...styles.modalBtn, color: '#f5ff86ff'}}/>
               </Pressable>
-              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60, borderLeftColor: 'white', borderLeftWidth: 1, borderBottomColor: 'white', borderBottomWidth: 1}} onPress={() => setImagePickerVisible(false)}>
+              <View style={styles.divider}></View>
+              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60}} onPress={() => setImagePickerVisible(false)}>
                 <Text style={styles.modalBtn}>Close</Text>
               </Pressable>
             </View>
@@ -262,8 +306,9 @@ export default function App() {
       <View style={styles.footContainer}>
         <View style={{ ...styles.btnManip, backgroundColor: '#252525ff', padding: 10, borderRadius: 5 }}>
           <Pressable onPress={() => setCommunityVisible(true)} style={styles.addBtn}><UsersRound style={styles.actionBtnText} size={36} /></Pressable>
-          <Pressable onPress={() => deleteAllImages()} style={styles.addBtn}><Trash style={{...styles.addBtnText, color: '#ffb3b3ff'}} size={36} /></Pressable>
+          <Pressable onPress={() => deleteAllImages()} style={styles.addBtn}><Trash style={{...styles.addBtnText, color: '#e4afafff'}} size={36} /></Pressable>
           <Pressable onPress={() => setImagePickerVisible(true)} style={styles.addBtn}><DiamondPlus style={styles.addBtnText} size={36} /></Pressable>
+          <Pressable onPress={saveImage} style={styles.addBtn}><Download style={{...styles.addBtnText, color: '#74f774ff'}} size={36} /></Pressable>
           <Pressable onPress={() => setHelpVisible(true)} style={styles.addBtn}><Info style={styles.actionBtnText} size={36} /></Pressable>
         </View>
       </View>
@@ -276,14 +321,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#252525ff' },
   canvasContainer: { flex: 1, margin: 20, backgroundColor: '#252525ff' },
   canvas: { flex: 1, borderBlockColor: 'black', borderColor: 'black', borderWidth: 2, backgroundColor: '#ffffffff', zIndex: 10, overflow: 'hidden' },
+  divider: { backgroundColor: 'white', height: 1},
   headContainer: { textAlign: 'center', alignItems: 'center', backgroundColor: '#252525ff', paddingBottom: 25, flexDirection: 'column', justifyContent: 'center' },
   footContainer: { textAlign: 'center', alignItems: 'center', backgroundColor: '#252525ff', paddingTop: 25, width: '100%', paddingBottom: 50, flexDirection: 'column', justifyContent: 'center' },
   searchContainer: { padding: 10, paddingBottom: 40, borderBottomWidth: 1, borderBottomColor: '#ddd' },
   searchInput: { backgroundColor: '#f2f2f2', padding: 10, marginHorizontal: 40, borderRadius: 8, fontSize: 16 },
-  addBtnText: { color: '#74f774ff', textAlign: 'center', fontSize: 50 },
+  addBtnText: { color: '#f5ff86ff', textAlign: 'center', fontSize: 50 },
   btnManip: { display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
   actionBtn: { marginHorizontal: 14, padding: 8, borderRadius: 6 },
-  addBtn: { marginHorizontal: 20, padding: 8, outlineColor: 'white' },
+  addBtn: { marginHorizontal: 14, padding: 8, outlineColor: 'white' },
   actionBtnText: { color: '#ffffffff', fontWeight: 'bold' },
   modalBtn: { backgroundColor: 'white', textAlign: 'center', fontSize: 16, borderRadius: '10%', backgroundColor: '#252525ff', color: 'white' },
   modal: { flex: 1, width: '100%', height: '100%', flexDirection: 'column', backgroundColor: '#252525ff', justifyContent: 'center', alignItems: 'center', gap: 20 },
