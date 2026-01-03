@@ -9,6 +9,7 @@ import * as MediaLibrary from 'expo-media-library';
 import ViewShot from 'react-native-view-shot';
 
 export default function App() {
+  const [isFirstLaunch, setIsFirstLaunch] = useState(null)
   const [images, setImages] = useState([]);
   const [imagePickerVisible, setImagePickerVisible] = useState(false);
   const [communityVisible, setCommunityVisible] = useState(false);
@@ -21,6 +22,34 @@ export default function App() {
   const imagePickerOpacity = useRef(new Animated.Value(0)).current;
   const emojiOpacity = useRef(new Animated.Value(0)).current;
   const viewRef = useRef();
+
+  useEffect(() => {
+    const checkFirstLaunch = async () => {
+      try {
+        const value = await AsyncStorage.getItem('hasLaunched');
+        console.log('value: ', value)
+        if (value === null) {
+          setIsFirstLaunch(true);
+          await AsyncStorage.setItem('hasLaunched', 'true');
+        }
+        else {
+          setIsFirstLaunch(false);
+        }
+      }
+      catch(e) {
+        console.log('Error reading first launch flag', e)
+      }
+    }
+    checkFirstLaunch();
+    
+  }, []); 
+
+  useEffect(() => {
+    if (isFirstLaunch === true) {
+      setHelpVisible(true);
+    }
+  }, [isFirstLaunch]);
+
   // Animate Image Picker
   useEffect(() => {
     Animated.timing(imagePickerOpacity, {
@@ -38,10 +67,6 @@ export default function App() {
       useNativeDriver: true,
     }).start();
   }, [emojiVisible]);
-  
-  const capture = async () => {
-    const uri = await viewRef.current.capture();
-  }
   const decodeHtml = (str) => {
     return str.replace(/&#(\d+);/g, (match, dec) => String.fromCodePoint(parseInt(dec, 10)));
   };
