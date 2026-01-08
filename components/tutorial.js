@@ -5,6 +5,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function TutorialModal({ visible, onClose }) {
   const steps = [
+    { text: "Welcome!", image: require('../assets/step1.png')},
     { text: "Tap the + button to\nadd images or icons.", image: require('../assets/step1.png') },
     { text: "Select an image to move, reorder, and resize. Hold an image to delete it.", image: require('../assets/step2.png') },
     { text: "Once your done designing, save\nthe canvas to your camera roll.", image: require('../assets/step3.png') },

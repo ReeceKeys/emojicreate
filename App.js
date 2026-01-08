@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { StyleSheet, View, Text, Modal, Pressable, FlatList, TextInput, Alert, Animated } from 'react-native';
+import { StyleSheet, View, Text, Modal, Pressable, FlatList, TextInput, Alert, Animated, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import ImageManipulator from './components/imagemanipulator';
 import { Download, DiamondPlus, History, SmilePlus, Image, Trash, Info, UsersRound, ArrowUp, ArrowUpToLine, ArrowDown, ArrowDownToLine } from "lucide-react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,8 +16,10 @@ export default function App() {
   const [helpVisible, setHelpVisible] = useState(false);
   const [emojiVisible, setEmojiVisible] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
-  const [emojis, setEmojis] = useState([]);
-  const [search, setSearch] = useState('');
+
+  // 🔹 NEW: emoji input (keeps same output format)
+  const [emojiInput, setEmojiInput] = useState('');
+
   const imageRefs = useRef({});
   const imagePickerOpacity = useRef(new Animated.Value(0)).current;
   const emojiOpacity = useRef(new Animated.Value(0)).current;
@@ -27,21 +29,17 @@ export default function App() {
     const checkFirstLaunch = async () => {
       try {
         const value = await AsyncStorage.getItem('hasLaunched');
-        console.log('value: ', value)
         if (value === null) {
           setIsFirstLaunch(true);
           await AsyncStorage.setItem('hasLaunched', 'true');
-        }
-        else {
+        } else {
           setIsFirstLaunch(false);
         }
-      }
-      catch(e) {
+      } catch(e) {
         console.log('Error reading first launch flag', e)
       }
     }
     checkFirstLaunch();
-    
   }, []); 
 
   useEffect(() => {
@@ -50,7 +48,6 @@ export default function App() {
     }
   }, [isFirstLaunch]);
 
-  // Animate Image Picker
   useEffect(() => {
     Animated.timing(imagePickerOpacity, {
       toValue: imagePickerVisible ? 1 : 0,
@@ -59,7 +56,6 @@ export default function App() {
     }).start();
   }, [imagePickerVisible]);
 
-  // Animate Emoji Modal
   useEffect(() => {
     Animated.timing(emojiOpacity, {
       toValue: emojiVisible ? 1 : 0,
@@ -67,60 +63,34 @@ export default function App() {
       useNativeDriver: true,
     }).start();
   }, [emojiVisible]);
-  const decodeHtml = (str) => {
-    return str.replace(/&#(\d+);/g, (match, dec) => String.fromCodePoint(parseInt(dec, 10)));
+
+  // 🔹 Emoji validation (Unicode, system-rendered)
+  const isEmoji = (text) => /\p{Extended_Pictographic}/u.test(text);
+
+  const addEmojiFromInput = () => {
+    const emojiChar = emojiInput.trim();
+
+    if (!emojiChar || !isEmoji(emojiChar)) {
+      Alert.alert("Invalid emoji", "Please enter a valid emoji.");
+      return;
+    }
+
+    setImages(prev => [
+      ...prev,
+      { id: Date.now().toString(), type: 'emoji', content: emojiChar }
+    ]);
+
+    setEmojiInput('');
+    setEmojiVisible(false);
   };
 
-  // Load emojis from API or cache
-  useEffect(() => {
-    const loadEmojis = async () => {
-      try {
-        const cached = await AsyncStorage.getItem('EMOJI_CACHE');
-        if (cached) {
-          setEmojis(JSON.parse(cached));
-          return;
-        }
-        const res = await fetch('https://emojihub.yurace.pro/api/all');
-        const data = await res.json();
-        setEmojis(data);
-        await AsyncStorage.setItem('EMOJI_CACHE', JSON.stringify(data));
-      } catch (err) {
-        console.error('Emoji load error:', err);
-      }
-    };
-    loadEmojis();
-  }, []);
-
-  const filteredEmojis = useMemo(() => {
-    return (emojis ?? []).filter(e => e?.name?.toLowerCase().includes(search.toLowerCase()));
-  }, [emojis, search]);
-
-  const renderItem = useCallback(({ item }) => {
-    const emojiChar = typeof item.htmlCode[0] === 'string' && item.htmlCode[0].includes('&#')
-      ? decodeHtml(item.htmlCode[0])
-      : item.htmlCode[0];
-
-    const handleAddEmoji = () => {
-      setImages(prev => [...prev, { id: Date.now().toString(), type: 'emoji', content: emojiChar }]);
-      setEmojiVisible(false);
-    };
-
-    return (
-      <Pressable onPress={handleAddEmoji} style={{ width: '50%', alignItems: 'center', padding: 50 }}>
-        <Text style={{ fontSize: 60 }}>{emojiChar}</Text>
-      </Pressable>
-    );
-  }, []);
-
   const saveImage = async () => {
-    // Request permission
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== 'granted') {
       alert('Permission to access camera roll is required.');
       return;
     }
 
-    // Function to capture and save
     const finishSave = async () => {
       try {
         const uri = await viewRef.current.capture();
@@ -132,7 +102,6 @@ export default function App() {
       }
     };
 
-    // Ask user before saving
     Alert.alert(
       'Save this image?',
       'This will save the entire canvas to your camera roll.',
@@ -160,7 +129,7 @@ export default function App() {
     }
   };
 
-  const deleteImage = (id) => setImages(prev => prev.filter(img => img.id !== id));
+  const deleteImage = (id) => setImages(prev => prev.filter(img => img.id !== id), setSelectedId(null));
   const deleteAllImages = () => Alert.alert(
     'Clear the canvas?',
     'This will remove all images from the canvas.',
@@ -171,10 +140,7 @@ export default function App() {
   );
 
   const moveToFront = () => {
-    if (!selectedId) {
-      Alert.alert("No photo selected", "Please select a photo to manipulate.");
-      return;
-    }
+    if (!selectedId) return;
     setImages(prev => {
       const sel = prev.find(i => i.id === selectedId);
       return [...prev.filter(i => i.id !== selectedId), sel];
@@ -182,10 +148,7 @@ export default function App() {
   };
 
   const moveToBack = () => {
-    if (!selectedId) {
-      Alert.alert("No photo selected", "Please select a photo to manipulate.");
-      return;
-    }
+    if (!selectedId) return;
     setImages(prev => {
       const sel = prev.find(i => i.id === selectedId);
       return [sel, ...prev.filter(i => i.id !== selectedId)];
@@ -193,10 +156,7 @@ export default function App() {
   };
 
   const moveUp = () => {
-    if (!selectedId) {
-      Alert.alert("No photo selected", "Please select a photo to manipulate.");
-      return;
-    }
+    if (!selectedId) return;
     setImages(prev => {
       const i = prev.findIndex(x => x.id === selectedId);
       if (i === prev.length - 1) return prev;
@@ -207,10 +167,7 @@ export default function App() {
   };
 
   const moveDown = () => {
-    if (!selectedId) {
-      Alert.alert("No photo selected", "Please select a photo to manipulate.");
-      return;
-    }
+    if (!selectedId) return;
     setImages(prev => {
       const i = prev.findIndex(x => x.id === selectedId);
       if (i === 0) return prev;
@@ -221,33 +178,33 @@ export default function App() {
   };
 
   const resetRotation = () => {
-    if (!selectedId) {
-      Alert.alert("No photo selected", "Please select a photo to manipulate.");
-      return;
-    }
+    if (!selectedId) return;
     imageRefs.current[selectedId]?.resetRotation();
   };
-
-  
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.headContainer}>
-        <View style={{ ...styles.btnManip, backgroundColor: '#252525ff', paddingVertical: 20, width: '100%', paddingTop: 100, borderRadius: 0 }}>
-          <Pressable onPress={moveToFront} style={styles.actionBtn}><ArrowUpToLine size={36} style={styles.actionBtnText} /></Pressable>
-          <Pressable onPress={moveToBack} style={styles.actionBtn}><ArrowDownToLine size={36} style={styles.actionBtnText} /></Pressable>
-          <Pressable onPress={resetRotation} style={styles.actionBtn}><History size={36} style={{...styles.actionBtnText, color: '#f5ff86ff'}} /></Pressable>
-          <Pressable onPress={moveUp} style={styles.actionBtn}><ArrowUp size={36} style={styles.actionBtnText} /></Pressable>
-          <Pressable onPress={moveDown} style={styles.actionBtn}><ArrowDown size={36} style={styles.actionBtnText} /></Pressable>
+        <View style={{ ...styles.btnManip, backgroundColor: '#252525ff', paddingVertical: 20, width: '100%', paddingTop: 100 }}>
+          {[
+            { onPress: moveToFront, icon: <ArrowUpToLine size={36} /> },
+            { onPress: moveToBack, icon: <ArrowDownToLine size={36} /> },
+            { onPress: resetRotation, icon: <History size={36} color="#f5ff86ff" /> },
+            { onPress: moveUp, icon: <ArrowUp size={36} /> },
+            { onPress: moveDown, icon: <ArrowDown size={36} /> },
+          ].map((btn, i) => (
+            <Pressable key={i} onPress={selectedId ? btn.onPress : undefined} disabled={!selectedId} style={[styles.actionBtn,{ opacity: selectedId ? 1 : 0 }]}>
+              {React.cloneElement(btn.icon, { style: styles.actionBtnText })}
+            </Pressable>
+          ))}
         </View>
       </View>
 
       {/* Canvas */}
-      
       <View style={styles.canvasContainer}>
         <ViewShot style={styles.canvas} ref={viewRef} options={{ format: 'png', quality: 1 }}>
-          <View  contentContainerStyle={{ flexGrow: 1, width: '100%' }}>
+          <View>
             {images.map(img => (
               <ImageManipulator
                 key={img.id}
@@ -264,82 +221,110 @@ export default function App() {
           </View>
         </ViewShot>
       </View>
-      
-
       {/* Image Picker Modal */}
-      <Modal visible={imagePickerVisible} transparent={false} animationType="fade" style={{ flex: 1, justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <Animated.View style={{ opacity: imagePickerOpacity,  height: '100%', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={styles.modal}>
-            <View style={styles.modalBtnContainer}>
-              
-              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60}} onPress={addImage}> 
-                <Image size={36} style={{...styles.modalBtn, color: '#74f774ff'}}></Image>
-              </Pressable>
-              <View style={styles.divider}></View>
-              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60}} onPress={() => { setImagePickerVisible(false); setTimeout(() => setEmojiVisible(true), 0); }}>
-                <SmilePlus size={36} style={{...styles.modalBtn, color: '#f5ff86ff'}}/>
-              </Pressable>
-              <View style={styles.divider}></View>
-              <Pressable style={{borderRadius: '10%', backgroundColor: '#252525ff', padding: 60}} onPress={() => setImagePickerVisible(false)}>
-                <Text style={styles.modalBtn}>Close</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Animated.View>
-      </Modal>
+<Modal
+  visible={imagePickerVisible}
+  transparent={false}
+  animationType="fade"
+  style={{ flex: 1, justifyContent: 'center', alignItems: 'center', height: '100%' }}
+>
+  <Animated.View
+    style={{
+      opacity: imagePickerOpacity,
+      height: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    <View style={styles.modal}>
+      <View style={styles.modalBtnContainer}>
+        <Pressable
+          style={{ borderRadius: '10%', backgroundColor: '#252525ff', padding: 60 }}
+          onPress={addImage}
+        >
+          <Image size={36} style={{ ...styles.modalBtn, color: '#74f774ff' }} />
+        </Pressable>
+
+        <View style={styles.divider} />
+
+        <Pressable
+          style={{ borderRadius: '10%', backgroundColor: '#252525ff', padding: 60 }}
+          onPress={() => {
+            setImagePickerVisible(false);
+            setTimeout(() => setEmojiVisible(true), 0);
+          }}
+        >
+          <SmilePlus size={36} style={{ ...styles.modalBtn, color: '#f5ff86ff' }} />
+        </Pressable>
+
+        <View style={styles.divider} />
+
+        <Pressable
+          style={{ borderRadius: '10%', backgroundColor: '#252525ff', padding: 60 }}
+          onPress={() => setImagePickerVisible(false)}
+        >
+          <Text style={styles.modalBtn}>Close</Text>
+        </Pressable>
+      </View>
+    </View>
+  </Animated.View>
+</Modal>
 
       {/* Emoji Modal */}
       <Modal visible={emojiVisible} transparent={false} animationType="fade">
         <Animated.View style={{ opacity: emojiOpacity, flex: 1 }}>
-          <View style={styles.emojiModal}>
-            <View style={{ marginTop: 100, borderBottomColor: 'black', borderBottomWidth: 1, width: '100%' }}>
-              <View style={styles.searchContainer}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={styles.emojiModal}>
+              <View style={{ marginTop: 60, paddingHorizontal: 30 }}>
+                
                 <TextInput
-                  placeholder="Search emojis…"
-                  value={search}
-                  onChangeText={setSearch}
-                  style={styles.searchInput}
-                  placeholderTextColor="#999"
+                  value={emojiInput}
+                  onChangeText={setEmojiInput}
+                  placeholder="Type an emoji 😀"
+                  autoFocus
+                  style={{
+                    backgroundColor: '#f2f2f2',
+                    fontSize: 40,
+                    padding: 20,
+                    borderRadius: 12,
+                    marginBottom: 24,
+                    textAlign: 'center',
+                  }}
                 />
+                <Text style={{fontSize: 12, textAlign: 'center', marginBottom: 48,}}>We recommend adding <Text style={{color: 'red'}}>1</Text> emoji at a time.</Text>
+                <View style={{alignItems: 'center', width: '100%'}}>
+                  <Pressable onPress={addEmojiFromInput} style={{ justifyContent: 'center', marginTop: 50, width: '50%' }}>
+                    <Text style={{ ...styles.modalBtn, borderRadius: '10%',  padding: 10 }}>Add Emoji</Text>
+                  </Pressable>
+
+                  <Pressable onPress={() => setEmojiVisible(false)} style={{ marginTop: 20 }}>
+                    <Text style={{ textAlign: 'center' }}>Cancel</Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
-            <FlatList
-              data={filteredEmojis}
-              keyExtractor={(item, index) => index.toString()}
-              numColumns={2}
-              renderItem={renderItem}
-              style={{ flex: 1 }}
-              keyboardShouldPersistTaps="handled"
-              columnWrapperStyle={{ justifyContent: 'center' }}
-              showsVerticalScrollIndicator={false}
-            />
-            <View style={{ marginBottom: 25, borderTopColor: 'black', borderTopWidth: 1, width: '100%', alignItems: 'center' }}>
-              <Pressable onPress={() => setEmojiVisible(false)} style={{ marginTop: 10 }}>
-                <Text style={{ ...styles.modalBtn, padding: 10, minWidth: '50%', marginTop: 25 }}>Close</Text>
-              </Pressable>
-            </View>
-          </View>
+            </TouchableWithoutFeedback>
         </Animated.View>
       </Modal>
 
-      <TutorialModal 
-        visible={helpVisible} 
-        onClose={() => setHelpVisible(false)} 
-      />
+      <TutorialModal visible={helpVisible} onClose={() => setHelpVisible(false)} />
 
       {/* Footer */}
       <View style={styles.footContainer}>
-        <View style={{ ...styles.btnManip, backgroundColor: '#252525ff', padding: 10, borderRadius: 5 }}>
-          <Pressable onPress={() => setCommunityVisible(true)} style={styles.addBtn}><UsersRound style={styles.actionBtnText} size={36} /></Pressable>
-          <Pressable onPress={() => deleteAllImages()} style={styles.addBtn}><Trash style={{...styles.addBtnText, color: '#e4afafff'}} size={36} /></Pressable>
-          <Pressable onPress={() => setImagePickerVisible(true)} style={styles.addBtn}><DiamondPlus style={styles.addBtnText} size={36} /></Pressable>
-          <Pressable onPress={saveImage} style={styles.addBtn}><Download style={{...styles.addBtnText, color: '#74f774ff'}} size={36} /></Pressable>
-          <Pressable onPress={() => setHelpVisible(true)} style={styles.addBtn}><Info style={styles.actionBtnText} size={36} /></Pressable>
+        <View style={{ ...styles.btnManip, backgroundColor: '#252525ff', padding: 10 }}>
+          <Pressable onPress={() => setCommunityVisible(true)} style={styles.addBtn}><UsersRound size={36} style={styles.addBtnText} /></Pressable>
+          <Pressable onPress={deleteAllImages} style={styles.addBtn}><Trash size={36} style={{...styles.addBtnText, color: '#fa9c9cff'}}/></Pressable>
+          <Pressable onPress={() => setImagePickerVisible(true)} style={styles.addBtn}><DiamondPlus size={36} style={{...styles.addBtnText, color: '#f1f38bff'}} /></Pressable>
+          <Pressable onPress={saveImage} style={styles.addBtn}><Download size={36} style={{...styles.addBtnText, color: '#a0f59dff'}} /></Pressable>
+          <Pressable onPress={() => setHelpVisible(true)} style={styles.addBtn}><Info size={36} style={styles.addBtnText} /></Pressable>
         </View>
       </View>
     </View>
   );
 }
+
+// styles unchanged
+
 
 // ==== Styles unchanged ====
 const styles = StyleSheet.create({
@@ -351,13 +336,13 @@ const styles = StyleSheet.create({
   footContainer: { textAlign: 'center', alignItems: 'center', backgroundColor: '#252525ff', paddingTop: 25, width: '100%', paddingBottom: 50, flexDirection: 'column', justifyContent: 'center' },
   searchContainer: { padding: 10, paddingBottom: 40, borderBottomWidth: 1, borderBottomColor: '#ddd' },
   searchInput: { backgroundColor: '#f2f2f2', padding: 10, marginHorizontal: 40, borderRadius: 8, fontSize: 16 },
-  addBtnText: { color: '#f5ff86ff', textAlign: 'center', fontSize: 50 },
+  addBtnText: { color: '#ffffffff', textAlign: 'center', fontSize: 50 },
   btnManip: { display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
   actionBtn: { marginHorizontal: 14, padding: 8, borderRadius: 6 },
   addBtn: { marginHorizontal: 14, padding: 8, outlineColor: 'white' },
   actionBtnText: { color: '#ffffffff', fontWeight: 'bold' },
   modalBtn: { backgroundColor: 'white', textAlign: 'center', fontSize: 16, borderRadius: '10%', backgroundColor: '#252525ff', color: 'white' },
   modal: { flex: 1, width: '100%', height: '100%', flexDirection: 'column', backgroundColor: '#252525ff', justifyContent: 'center', alignItems: 'center', gap: 20 },
-  emojiModal: { flex: 1, backgroundColor: '#ffffffcc', justifyContent: 'center' },
+  emojiModal: { flex: 1, backgroundColor: '#ffffffcc', justifyContent: 'center', alignContent: 'center' },
   modalBtnContainer: { textAlign: 'center', justifyContent: 'center', maxWidth: '100%', gap: 50, height: '100%'}
 });

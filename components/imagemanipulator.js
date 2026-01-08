@@ -1,7 +1,7 @@
 import React, { useRef, useImperativeHandle, forwardRef } from 'react';
 import { View, Image, StyleSheet, Animated, PanResponder, Alert, Text } from 'react-native';
 
-const ImageManipulator = forwardRef(({ id, content, type, selected, onSelect, onDelete, rotationSensitivity = 0.1 }, ref) => {
+const ImageManipulator = forwardRef(({ id, content, type, selected, onSelect, onDelete, rotationSensitivity = 0.03 }, ref) => {
   const pan = useRef(new Animated.ValueXY()).current;
   const scale = useRef(new Animated.Value(1)).current;
   const rotate = useRef(new Animated.Value(0)).current; // radians
