@@ -29,7 +29,7 @@ const ImageManipulator = forwardRef(({ id, content, type, selected, onSelect, on
         longPressTimeout.current = setTimeout(() => {
           Alert.alert(
             "Delete Image",
-            "Are you sure?",
+            "This will remove the image from the canvas. Are you sure?",
             [
               { text: "Cancel", style: "cancel" },
               { text: "Delete", style: "destructive", onPress: () => onDelete(id) }

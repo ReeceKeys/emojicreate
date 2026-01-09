@@ -1,18 +1,18 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useContext, useRef, useEffect, useState } from 'react';
 import { Platform, Modal, View, Text, Pressable, Animated, StyleSheet, Dimensions, ScrollView, Image } from 'react-native';
-
+import { ThemeContext } from '../theme/ThemeContext';
 const { width, height } = Dimensions.get('window');
 
 export default function TutorialModal({ visible, onClose }) {
   const steps = [
     { text: "Welcome!", image: require('../assets/step1.png')},
-    { text: "Tap the + button to\nadd images or icons.", image: require('../assets/step1.png') },
-    { text: "Select an image to move, reorder, and resize. Hold an image to delete it.", image: require('../assets/step2.png') },
-    { text: "Once your done designing, save\nthe canvas to your camera roll.", image: require('../assets/step3.png') },
-    { text: "In your camera roll, hold your\nicon and select add sticker.", image: require('../assets/step4.png') },
-    { text: "Your new icon will be available\nto use in your messages!", image: require('../assets/step4.png') }
+    { text: "Tap the + button to\nadd images or icons.", image: require('../assets/step2.png') },
+    { text: "Select an image to move, reorder, and resize. Hold an image to delete it.", image: require('../assets/step3.png') },
+    { text: "Once your done designing, save\nthe canvas to your camera roll.", image: require('../assets/step4.png') },
+    { text: "In your camera roll, hold your\nicon and select Add Sticker.", image: require('../assets/step5.png') },
+    { text: "Your new icon will be available\nto use in your messages!", image: require('../assets/step6.png') }
   ];
-
+  const { colors, mode, setMode } = useContext(ThemeContext);
   const [currentStep, setCurrentStep] = useState(0);
   const animValues = useRef(steps.map(() => new Animated.Value(0))).current;
   const closeAnim = useRef(new Animated.Value(0)).current; // single value, not array
@@ -69,7 +69,7 @@ export default function TutorialModal({ visible, onClose }) {
 
   return (
     <Modal visible={visible} transparent={false} animationType="fade">
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { backgroundColor: colors.background }]}>
         <ScrollView
           horizontal
           pagingEnabled
@@ -113,7 +113,7 @@ export default function TutorialModal({ visible, onClose }) {
                     resizeMode="contain"
                   />
                 )}
-                <Text style={styles.stepText}>{step.text}</Text>
+                <Text style={[styles.stepText, { color: colors.text }]}>{step.text}</Text>
               </Animated.View>
             );
           })}
@@ -125,34 +125,40 @@ export default function TutorialModal({ visible, onClose }) {
             <View
               key={index}
               style={[
-                styles.dot,
-                index === currentStep ? styles.dotActive : null
+                { ...styles.dot, backgroundColor: colors.dot },
+                index === currentStep ? { backgroundColor: colors.dotactive } : null
               ]}
             />
           ))}
         </View>
 
         {/* Close Button */}
-        <View style={styles.closeContainer}>
-          <Animated.View
-            style={[
-              styles.closeContainer,
-              {
-                opacity: closeAnim,
-                transform: [{
-                  translateY: closeAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0] // slide up from below
-                  })
-                }]
-              }
-            ]}
-          >
-            <Pressable onPress={handleClose} style={styles.closeBtn}>
-              <Text style={styles.closeText}>Close</Text>
-            </Pressable>
-          </Animated.View>
-        </View>
+<Animated.View
+  style={[
+    styles.closeContainer,
+    {
+      opacity: closeAnim,
+      transform: [
+        {
+          translateY: closeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [40, 0], // enough room to slide in
+          }),
+        },
+      ],
+    },
+  ]}
+>
+  <Pressable
+    onPress={handleClose}
+    style={[styles.closeBtn, { backgroundColor: colors.primary }]}
+  >
+    <Text style={[styles.closeText, { color: colors.background }]}>
+      Close
+    </Text>
+  </Pressable>
+</Animated.View>
+
       </View>
     </Modal>
   );
@@ -162,10 +168,9 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' },
   stepContainer: { height, justifyContent: 'center', alignItems: 'center', padding: 30 },
   stepText: { fontSize: 22, color: '#333', textAlign: 'center' },
-  dotsContainer: { bottom: 80, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ccc', marginHorizontal: 6 },
-  dotActive: { backgroundColor: '#252525' },
-  closeContainer: { bottom: 20, width: '100%', alignItems: 'center' },
-  closeBtn: { paddingVertical: 24, paddingHorizontal: 30, backgroundColor: '#252525', borderRadius: '10%' },
-  closeText: { color: 'white', fontSize: 16, fontWeight: 'bold' }
+  dotsContainer: { bottom: 160, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  dot: { width: 10, height: 10, borderRadius: 5, marginHorizontal: 6 },
+  closeContainer: { position: 'absolute', bottom: 50, width: '100%', alignItems: 'center' },
+  closeBtn: { paddingVertical: 18, width: '80%', paddingHorizontal: 40, borderRadius: 50, alignItems: 'center' },
+  closeText: { fontSize: 16, fontWeight: 'bold' }
 });
